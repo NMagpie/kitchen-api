@@ -12,6 +12,7 @@ public class RequestController {
     @RequestMapping(value = "/order", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
     public String getOrder(@RequestBody RequestForm object) {
         System.out.println(object.toString());
+
         return "Order was received!";
     }
 
