@@ -150,7 +150,7 @@ public class Order {
         this.generalPriority = pick_up_time - priority;
     }
 
-    public int  getFoodToCook(int rank) {
+    public int getFoodToCook(int rank) {
         int maxComp = 0;
         int index = 0;
         for (int i = 0; i < foods.size(); i++) {

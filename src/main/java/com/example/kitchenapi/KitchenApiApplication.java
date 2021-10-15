@@ -3,14 +3,13 @@ package com.example.kitchenapi;
 import com.example.kitchenapi.apparatus.Apparatus;
 import com.example.kitchenapi.cooker.Cooker;
 import com.example.kitchenapi.order.Order;
-import com.example.kitchenapi.requestcontroller.RequestController;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import java.sql.Time;
 import java.util.ArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 @SpringBootApplication
 public class KitchenApiApplication {
@@ -22,9 +21,9 @@ public class KitchenApiApplication {
 
 	public static final ArrayList<Order> orders = new ArrayList<>();
 
-	private static final ArrayList<Apparatus> ovens = new ArrayList<>();
+	private static Semaphore stoves;
 
-	private static final ArrayList<Apparatus> stoves = new ArrayList<>();
+	private static Semaphore ovens;
 
 	public static void main(String[] args) {
 
@@ -33,8 +32,13 @@ public class KitchenApiApplication {
 			System.exit(0);
 		}
 
-		ReentrantLock lock = new ReentrantLock();
-		Condition condition = lock.newCondition();
+		int cookersSize = 6;
+
+		stoves = new Semaphore((int) Math.round(cookersSize / 1.75),true);
+
+		ovens = new Semaphore((int) Math.round(cookersSize / 3.5),true);
+
+		SpringApplication.run(KitchenApiApplication.class, args);
 
 		ArrayList<Cooker> cookers = new ArrayList<>();
 
@@ -43,68 +47,37 @@ public class KitchenApiApplication {
 			new Thread(cookers.get(i)).start();
 		}*/
 
-		cookers.add(new Cooker(1,condition));
+		cookers.add(new Cooker(1));
 		new Thread(cookers.get(0)).start();
 
-		cookers.add(new Cooker(1,condition));
+		cookers.add(new Cooker(1));
 		new Thread(cookers.get(1)).start();
 
-		cookers.add(new Cooker(2,condition));
+		cookers.add(new Cooker(2));
 		new Thread(cookers.get(2)).start();
 
-		cookers.add(new Cooker(2,condition));
+		cookers.add(new Cooker(2));
 		new Thread(cookers.get(3)).start();
 
-		cookers.add(new Cooker(2,condition));
+		cookers.add(new Cooker(2));
 		new Thread(cookers.get(4)).start();
 
-		cookers.add(new Cooker(3,condition));
+		cookers.add(new Cooker(3));
 		new Thread(cookers.get(5)).start();
 
-		for (int i = 0; i < Math.round(cookers.size() / 3.5); i++)
-		addOven();
-		for (int i = 0; i < Math.round(cookers.size() / 1.75); i++)
-		addStove();
-
-		RequestController.setCondition(condition);
-
-		SpringApplication.run(KitchenApiApplication.class, args);
-
 	}
 
-	private static void addOven() {
-		ovens.add(Apparatus.Oven);
-	}
-
-	private static void addStove() {
-		stoves.add(Apparatus.Stove);
-	}
-
-	public static boolean isAvailable(Apparatus apparatus){
+	public static boolean isAvailable(Apparatus apparatus) {
 		if (apparatus == null) return true;
-		if (apparatus.ordinal() == 0) {
-			for (int i = 0; i < ovens.size(); i++)
-				if (!ovens.get(i).isLocked()) return true;
-		} else {
-			for (int i = 0; i < stoves.size(); i++)
-				if (!stoves.get(i).isLocked()) return true;
-		}
-		return false;
+		if (apparatus.ordinal() == 0) return ovens.availablePermits() > 0;
+		return stoves.availablePermits() > 0;
 	}
 
-	public static Apparatus getAvailableApp(Apparatus apparatus) {
-		if (apparatus.ordinal() == 0) {
-			for (int i = 0; i < ovens.size(); i++)
-				if (!ovens.get(i).isLocked()) { ovens.get(i).lock(); return ovens.get(i); }
-			int index = (int) (Math.random()*ovens.size());
-			ovens.get(index).lock(); return ovens.get(index);
-		} else {
-			for (int i = 0; i < stoves.size(); i++)
-				if (!stoves.get(i).isLocked()) { stoves.get(i).lock(); return stoves.get(i); }
-			int index = (int) (Math.random()*stoves.size());
-			stoves.get(index).lock(); return stoves.get(index);
-		}
-
+	public static Semaphore getStoves() {
+		return stoves;
 	}
 
+	public static Semaphore getOvens() {
+		return ovens;
+	}
 }
