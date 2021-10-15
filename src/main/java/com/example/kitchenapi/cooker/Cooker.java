@@ -1,5 +1,7 @@
 package com.example.kitchenapi.cooker;
 
+import com.example.kitchenapi.apparatus.Apparatus;
+import com.example.kitchenapi.food.Food;
 import com.example.kitchenapi.order.Order;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
@@ -71,17 +73,19 @@ public class Cooker implements Runnable{
 
     }
 
-    private int getMaxPriority() {
-        int index = -1;
+    private Order getMaxPriority() {
+        //int index = -1;
+        Order orderReturn = null;
         long priority = Long.MAX_VALUE;
         for (int i = 0; i < orders.size(); i++) {
             Order order = orders.get(i);
             if (!order.isOccupied() && priority > order.getGeneralPriority() && !order.isDone()) {
                 priority = order.getGeneralPriority();
-                index = i;
+                //index = i;
+                orderReturn = order;
             }
         }
-        return index;
+        return orderReturn;
     }
 
     private void waitForOrders() {
@@ -106,7 +110,7 @@ public class Cooker implements Runnable{
     @Override
     public void run() {
 
-        int order;
+        Order order;
 
         int food;
 
@@ -116,17 +120,17 @@ public class Cooker implements Runnable{
 
             //waitForOrders();
 
-            if (!orders.isEmpty() && (order = getMaxPriority()) != -1 && proficiency > 0) {
+            if (!orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
 
-                food = orders.get(order).getFoodToCook(rank);
+                food = order.getFoodToCook(rank);
 
-                if (!orders.get(order).getFoods().get(food).isPreparing() && orders.get(order).getFoods().get(food).tryLock()) {
-                    orders.get(order).getFoods().get(food).makePreparing();
-                    System.out.println("Cooker "+ id + " is preparing order "+orders.get(order).getOrder_id()+ " dish "+ orders.get(order).getFoods().get(food).getName());
-                    if (!orders.get(order).startedCooking()) orders.get(order).startCooking();
+                if (!order.getFoods().get(food).isPreparing() && order.getFoods().get(food).tryLock()) {
+                    order.getFoods().get(food).makePreparing();
+                    System.out.println("Cooker "+ id + " is preparing order "+order.getOrder_id()+ " dish "+ order.getFoods().get(food).getName());
+                    if (!order.startedCooking()) order.startCooking();
                     proficiency--;
-                    new Thread(new Cooking(order,food)).start();
-                    orders.get(order).getFoods().get(food).unlock();
+                    new Thread(new Cooking(order.getOrder_id(),food)).start();
+                    order.getFoods().get(food).unlock();
                 }
 
             }
@@ -139,18 +143,28 @@ public class Cooker implements Runnable{
 
     private class Cooking implements Runnable {
 
-        private final int orderInd;
+        private final int orderId;
 
         private final int food;
 
         public Cooking(int order, int food) {
-            this.orderInd = order;
+            this.orderId = order;
             this.food = food;
         }
 
         @Override
         public void run() {
-            Order order = orders.get(orderInd);
+            Order order = null;
+            for (int i = 0; i < orders.size(); i++)
+                if (orders.get(i).getOrder_id() == orderId) order = orders.get(i);
+
+                if (order == null) return;
+
+            Apparatus apparatus = null;
+
+            if (order.getFoods().get(food).getCooking_apparatus() != null)
+            apparatus = getAvailableApp(order.getFoods().get(food).getCooking_apparatus());
+
             Thread.currentThread().setName("Cooking-"+id);
             try {
                 timeUnit.sleep(order.getFoods().get(food).getPreparation_time());
@@ -160,6 +174,10 @@ public class Cooker implements Runnable{
 
             order.makeDone(food,id);
             proficiency++;
+
+            if (apparatus != null)
+                apparatus.unlock();
+
             if (!orders.isEmpty() && order.isDone() && orders.contains(order)) {
                 orders.remove(order);
                 sendOrder(order);

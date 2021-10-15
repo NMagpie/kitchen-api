@@ -8,6 +8,8 @@ import java.util.concurrent.TimeUnit;
 
 import static com.example.kitchenapi.KitchenApiApplication.timeUnit;
 
+import static com.example.kitchenapi.KitchenApiApplication.isAvailable;
+
 public class Order {
 
     private int order_id;
@@ -148,12 +150,17 @@ public class Order {
         this.generalPriority = pick_up_time - priority;
     }
 
-    public int getFoodToCook(int rank) {
+    public int  getFoodToCook(int rank) {
         int maxComp = 0;
         int index = 0;
         for (int i = 0; i < foods.size(); i++) {
             Food food = foods.get(i);
-            if (!food.isLocked() && food.getComplexity()<=rank && maxComp < food.getComplexity() && !food.isPreparing()) {
+            if (!food.isLocked() &&
+                    food.getComplexity()<=rank &&
+                    maxComp < food.getComplexity() &&
+                    !food.isPreparing() &&
+                    isAvailable(food.getCooking_apparatus())
+                    ) {
                 maxComp = food.getComplexity();
                 index = i;
             }
