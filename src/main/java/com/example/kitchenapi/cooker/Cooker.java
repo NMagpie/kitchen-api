@@ -1,5 +1,7 @@
 package com.example.kitchenapi.cooker;
 
+import com.example.kitchenapi.apparatus.Apparatus;
+import com.example.kitchenapi.food.Food;
 import com.example.kitchenapi.order.Order;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
@@ -7,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Condition;
 
 import static com.example.kitchenapi.KitchenApiApplication.*;
@@ -25,7 +28,9 @@ public class Cooker implements Runnable{
 
     private final String catchPhrase = "Kek";
 
-    private final Condition condition;
+    private Semaphore ovens = null;
+
+    private Semaphore stoves = null;
 
     private static final String url = "http://localhost:8081/distribution";
 
@@ -33,25 +38,24 @@ public class Cooker implements Runnable{
 
     private static final HttpHeaders headers = new HttpHeaders() {{setContentType(MediaType.APPLICATION_JSON);}};
 
-    public Cooker(Condition condition) {
+    public Cooker() {
         int a = 0;
         this.rank = (int) (Math.random()*2+1);
         if (Math.random() > 0.7) a++;
         this.proficiency = rank + a;
-        this.condition = condition;
         //this.proficiency = rank + (int) (Math.round(Math.random()));
     }
 
-    public Cooker(int rank, Condition condition) {
+    public Cooker(int rank) {
         int a = 0;
         this.rank = rank;
         if (Math.random() > 0.7) a++;
         this.proficiency = rank + a;
-        this.condition = condition;
+        this.ovens = getOvens();
+        this.stoves = getStoves();
     }
 
     public void sendOrder(Order order) {
-        //RestTemplate restTemplate = new RestTemplate();
         JSONObject object = new JSONObject(order);
 
         object.remove("generalPriority");
@@ -62,29 +66,27 @@ public class Cooker implements Runnable{
 
         HttpEntity<String> request = new HttpEntity<>(object.toString(),headers);
         String response = restTemplate.postForObject(url,request,String.class);
-        if (response == null || !response.equals("Success!")) {
+        if (response == null) {
             System.out.println("No response! Exiting program...");
             System.exit(0);
         }
 
-        //System.out.println(object);
-
     }
 
-    private int getMaxPriority() {
-        int index = -1;
+    private Order getMaxPriority() {
+        Order orderReturn = null;
         long priority = Long.MAX_VALUE;
         for (int i = 0; i < orders.size(); i++) {
             Order order = orders.get(i);
             if (!order.isOccupied() && priority > order.getGeneralPriority() && !order.isDone()) {
                 priority = order.getGeneralPriority();
-                index = i;
+                orderReturn = order;
             }
         }
-        return index;
+        return orderReturn;
     }
 
-    private void waitForOrders() {
+/*    private void waitForOrders() {
         try {
         while (orders.isEmpty())
                 condition.await();
@@ -92,7 +94,7 @@ public class Cooker implements Runnable{
         catch (InterruptedException e) {
             e.printStackTrace();
         }
-    }
+    }*/
 
     private void waitRest() {
         try {
@@ -106,7 +108,7 @@ public class Cooker implements Runnable{
     @Override
     public void run() {
 
-        int order;
+        Order order;
 
         int food;
 
@@ -114,19 +116,17 @@ public class Cooker implements Runnable{
 
         while (true) {
 
-            //waitForOrders();
+            if (!orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
 
-            if (!orders.isEmpty() && (order = getMaxPriority()) != -1 && proficiency > 0) {
+                food = order.getFoodToCook(rank);
 
-                food = orders.get(order).getFoodToCook(rank);
-
-                if (!orders.get(order).getFoods().get(food).isPreparing() && orders.get(order).getFoods().get(food).tryLock()) {
-                    orders.get(order).getFoods().get(food).makePreparing();
-                    System.out.println("Cooker "+ id + " is preparing order "+orders.get(order).getOrder_id()+ " dish "+ orders.get(order).getFoods().get(food).getName());
-                    if (!orders.get(order).startedCooking()) orders.get(order).startCooking();
+                if (!order.getFoods().get(food).isPreparing() && order.getFoods().get(food).tryLock()) {
+                    order.getFoods().get(food).makePreparing();
+                    System.out.println("Cooker "+ id + " is preparing order "+order.getOrder_id()+ " dish "+ order.getFoods().get(food).getName());
+                    if (!order.startedCooking()) order.startCooking();
                     proficiency--;
-                    new Thread(new Cooking(order,food)).start();
-                    orders.get(order).getFoods().get(food).unlock();
+                    new Thread(new Cooking(order.getOrder_id(),food)).start();
+                    order.getFoods().get(food).unlock();
                 }
 
             }
@@ -139,18 +139,40 @@ public class Cooker implements Runnable{
 
     private class Cooking implements Runnable {
 
-        private final int orderInd;
+        private final int orderId;
 
         private final int food;
 
         public Cooking(int order, int food) {
-            this.orderInd = order;
+            this.orderId = order;
             this.food = food;
         }
 
         @Override
         public void run() {
-            Order order = orders.get(orderInd);
+            Order order = null;
+            for (int i = 0; i < orders.size(); i++)
+                if (orders.get(i).getOrder_id() == orderId) order = orders.get(i);
+
+                if (order == null) return;
+
+            Apparatus apparatus = order.getFoods().get(food).getCooking_apparatus();
+
+            if (apparatus != null)
+                if (apparatus.ordinal() == 0) {
+                    try {
+                        ovens.acquire();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    try {
+                        stoves.acquire();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
             Thread.currentThread().setName("Cooking-"+id);
             try {
                 timeUnit.sleep(order.getFoods().get(food).getPreparation_time());
@@ -160,6 +182,11 @@ public class Cooker implements Runnable{
 
             order.makeDone(food,id);
             proficiency++;
+
+            if (apparatus != null)
+                if (apparatus.ordinal() == 0) ovens.release();
+                else stoves.release();
+
             if (!orders.isEmpty() && order.isDone() && orders.contains(order)) {
                 orders.remove(order);
                 sendOrder(order);
