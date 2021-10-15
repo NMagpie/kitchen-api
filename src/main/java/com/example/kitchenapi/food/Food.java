@@ -1,5 +1,9 @@
 package com.example.kitchenapi.food;
 
+import com.example.kitchenapi.apparatus.Apparatus;
+
+import java.util.concurrent.locks.ReentrantLock;
+
 public class Food {
 
     private int id;
@@ -10,7 +14,11 @@ public class Food {
 
     private int complexity;
 
-    private String cooking_apparatus;
+    private Apparatus cooking_apparatus;
+
+    private Boolean isPreparing = false;
+
+    private ReentrantLock lock = new ReentrantLock();
 
     public Food(int id) {
         this.id = id;
@@ -20,7 +28,7 @@ public class Food {
                 this.name = "pizza";
                 this.preparation_time = 20;
                 this.complexity = 2;
-                this.cooking_apparatus = "oven";
+                this.cooking_apparatus = Apparatus.Oven;
                 break;
 
             case (2):
@@ -34,7 +42,7 @@ public class Food {
                 this.name = "zeama";
                 this.preparation_time = 7;
                 this.complexity = 1;
-                this.cooking_apparatus = "stove";
+                this.cooking_apparatus = Apparatus.Stove;
                 break;
 
             case (4):
@@ -48,14 +56,14 @@ public class Food {
                 this.name = "Island Duck with Mulberry Mustard";
                 this.preparation_time = 35;
                 this.complexity = 3;
-                this.cooking_apparatus = "oven";
+                this.cooking_apparatus = Apparatus.Oven;
                 break;
 
             case (6):
                 this.name = "Waffles";
                 this.preparation_time = 10;
                 this.complexity = 1;
-                this.cooking_apparatus = "stove";
+                this.cooking_apparatus = Apparatus.Stove;
                 break;
 
             case (7):
@@ -69,14 +77,14 @@ public class Food {
                 this.name = "Lasagna";
                 this.preparation_time = 30;
                 this.complexity = 2;
-                this.cooking_apparatus = "oven";
+                this.cooking_apparatus = Apparatus.Oven;
                 break;
 
             case (9):
                 this.name = "Burger";
                 this.preparation_time = 15;
                 this.complexity = 1;
-                this.cooking_apparatus = "oven";
+                this.cooking_apparatus = Apparatus.Oven;
                 break;
 
             case (10):
@@ -108,8 +116,25 @@ public class Food {
         return complexity;
     }
 
-    public String getCooking_apparatus() {
+    public Apparatus getCooking_apparatus() {
         return cooking_apparatus;
     }
 
+    public Boolean isPreparing() {
+        return isPreparing;
+    }
+
+    public void makePreparing() {
+        this.isPreparing = true;
+    }
+
+    public Boolean isLocked() {return lock.isLocked();}
+
+    public Boolean tryLock() {
+        return lock.tryLock();
+    }
+
+    public void unlock() {
+        lock.unlock();
+    }
 }

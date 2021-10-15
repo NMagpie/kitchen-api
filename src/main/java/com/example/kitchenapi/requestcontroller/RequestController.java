@@ -1,19 +1,29 @@
 package com.example.kitchenapi.requestcontroller;
 
+import com.example.kitchenapi.KitchenApiApplication;
+import com.example.kitchenapi.order.Order;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.concurrent.locks.Condition;
 
 @RestController
 public class RequestController {
 
-    @RequestMapping(value = "/order", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public String getOrder(@RequestBody RequestForm object) {
-        System.out.println(object.toString());
+    private static Condition condition;
 
-        return "Order was received!";
+    public static void setCondition(Condition condition) {
+        RequestController.condition = condition;
+    }
+
+    @PostMapping(value = "/order", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public String getOrder(@RequestBody Order object) {
+        object.setGeneralPriority();
+        KitchenApiApplication.orders.add(object);
+        //condition.signalAll();
+        return "Success!";
     }
 
 }
