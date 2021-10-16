@@ -1,7 +1,6 @@
 package com.example.kitchenapi.cooker;
 
 import com.example.kitchenapi.apparatus.Apparatus;
-import com.example.kitchenapi.food.Food;
 import com.example.kitchenapi.order.Order;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
@@ -10,7 +9,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.locks.Condition;
 
 import static com.example.kitchenapi.KitchenApiApplication.*;
 
@@ -32,7 +30,7 @@ public class Cooker implements Runnable{
 
     private Semaphore stoves = null;
 
-    private static final String url = "http://localhost:8081/distribution";
+    private static final String url = getURL()+"/distribution";
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -43,6 +41,8 @@ public class Cooker implements Runnable{
         this.rank = (int) (Math.random()*2+1);
         if (Math.random() > 0.7) a++;
         this.proficiency = rank + a;
+        this.ovens = getOvens();
+        this.stoves = getStoves();
         //this.proficiency = rank + (int) (Math.round(Math.random()));
     }
 
@@ -98,7 +98,7 @@ public class Cooker implements Runnable{
 
     private void waitRest() {
         try {
-        restTime.sleep(1);
+        getRestTime().sleep(1);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -175,7 +175,7 @@ public class Cooker implements Runnable{
 
             Thread.currentThread().setName("Cooking-"+id);
             try {
-                timeUnit.sleep(order.getFoods().get(food).getPreparation_time());
+                getTimeUnit().sleep(order.getFoods().get(food).getPreparation_time());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -190,7 +190,7 @@ public class Cooker implements Runnable{
             if (!orders.isEmpty() && order.isDone() && orders.contains(order)) {
                 orders.remove(order);
                 sendOrder(order);
-                System.out.println("Order "+ order.getOrder_id() + " was prepared sent back within "+ order.getCooking_time() + " " + timeUnit.name()+"\n");
+                System.out.println("Order "+ order.getOrder_id() + " was prepared sent back within "+ order.getCooking_time() + " " + getTimeUnit().name()+"\n");
             }
         }
     }
