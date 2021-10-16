@@ -6,9 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
-import static com.example.kitchenapi.KitchenApiApplication.timeUnit;
-
-import static com.example.kitchenapi.KitchenApiApplication.isAvailable;
+import static com.example.kitchenapi.KitchenApiApplication.*;
 
 public class Order {
 
@@ -107,7 +105,7 @@ public class Order {
     public synchronized void cookingFinished() {
         //cooking_time = (long) ((System.currentTimeMillis() - cooking_time) / Math.pow(10,power));
         if (!finished) {
-            cooking_time = timeUnit.convert(System.currentTimeMillis() - cooking_time, TimeUnit.MILLISECONDS);
+            cooking_time = getTimeUnit().convert(System.currentTimeMillis() - cooking_time, TimeUnit.MILLISECONDS);
             finished = true;
         }
     }
