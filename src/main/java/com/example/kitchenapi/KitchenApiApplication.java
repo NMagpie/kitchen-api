@@ -46,13 +46,41 @@ public class KitchenApiApplication {
 
 		addCookers();
 
+/*		Scanner scanner = new Scanner(System.in);
+
+		String kek = "";
+
+		while (!kek.equals("q")) {
+			kek = scanner.nextLine();
+		}
+
+		System.out.println("Exiting program...");
+
+		scanner.close();
+
+		System.exit(0);*/
+
 	}
 
-	private static void parsingError() {
+	private static void parsingError(int intCase) {
 		System.out.println("Wrong data in config-file! Config file has to contain by lines:" +
-				"1. Time units by capslock (e.g. MILLISECONDS, SECONDS, MICROSECONDS)" +
-				"2. IPv4 address or URL of DinningHall and its port (e.g. http://localhost:8081)" +
-				"3. number of Cookers in Kitchen (integer)");
+				"\n1. Time units by capslock (e.g. MILLISECONDS, SECONDS, MICROSECONDS)" +
+				"\n2. IPv4 address or URL of DinningHall and its port (e.g. http://localhost:8081)" +
+				"\n3. number of Cookers in Kitchen (integer)");
+		switch (intCase) {
+			case 0:
+				System.out.println("ERROR: WRONG NUMBER OF LINES");
+				break;
+			case 1:
+				System.out.println("ERROR IN LINE 1: TIMEUNITS");
+				break;
+			case 2:
+				System.out.println("ERROR IN LINE 2: ADDRESS OR IP");
+				break;
+			case 3:
+				System.out.println("ERROR IN LINE 3: NUMBER OF COOKERS");
+				break;
+		}
 		try {
 			TimeUnit.SECONDS.sleep(20);
 		} catch (InterruptedException e) {
@@ -115,16 +143,16 @@ public class KitchenApiApplication {
 
 		if (scanner.hasNextLine()) {tUnit = scanner.nextLine(); try {
 			timeUnit = TimeUnit.valueOf(tUnit);
-		} catch (IllegalArgumentException e) { parsingError(); }
-		} else { parsingError(); }
+		} catch (IllegalArgumentException e) { parsingError(1); }
+		} else { parsingError(0); }
 
-		if (scanner.hasNextLine()) URL = scanner.nextLine(); else { parsingError(); }
-		if (!URL.matches("(https?\\:\\/\\/\\w+\\:\\d{4})|((\\d{1,3}\\.){3}(\\d{1,3})(\\/\\d+)?)")) parsingError();
+		if (scanner.hasNextLine()) URL = scanner.nextLine(); else { parsingError(0); }
+		if (!URL.matches("((https?\\:\\/\\/[\\w-]+)|(((https?\\:\\/\\/)?\\d{1,3}\\.){3}(\\d{1,3})(\\/\\d+)?))\\:\\d{4}")) parsingError(2);
 
 		if (scanner.hasNextLine()) try { cookersSize= scanner.nextInt(); }
-		catch (InputMismatchException e) { parsingError(); }
-		else { parsingError(); }
-		if (cookersSize < 1) parsingError();
+		catch (InputMismatchException e) { parsingError(3); }
+		else { parsingError(0); }
+		if (cookersSize < 1) parsingError(3);
 
 		scanner.close();
 
