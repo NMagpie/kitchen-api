@@ -3,9 +3,11 @@ package com.example.kitchenapi.cooker;
 import com.example.kitchenapi.apparatus.Apparatus;
 import com.example.kitchenapi.order.Order;
 import org.json.JSONObject;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.Semaphore;
@@ -26,13 +28,13 @@ public class Cooker implements Runnable{
 
     private final String catchPhrase = "Kek";
 
-    private Semaphore ovens = null;
+    private final Semaphore ovens;
 
-    private Semaphore stoves = null;
+    private final Semaphore stoves;
 
     private static final String url = getURL()+"/distribution";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = new RestTemplateBuilder().build();
 
     private static final HttpHeaders headers = new HttpHeaders() {{setContentType(MediaType.APPLICATION_JSON);}};
 
@@ -65,12 +67,17 @@ public class Cooker implements Runnable{
         object.remove("done");
 
         HttpEntity<String> request = new HttpEntity<>(object.toString(),headers);
-        String response = restTemplate.postForObject(url,request,String.class);
-        if (response == null) {
-            System.out.println("No response! Exiting program...");
-            System.exit(0);
+        try {
+            restTemplate.postForObject(url,request,String.class);
+        } catch (ResourceAccessException e) {
+            noResponse();
         }
 
+    }
+
+    public static synchronized void noResponse() {
+        System.out.println("No response! Exiting program...");
+        System.exit(0);
     }
 
     private Order getMaxPriority() {
@@ -78,23 +85,13 @@ public class Cooker implements Runnable{
         long priority = Long.MAX_VALUE;
         for (int i = 0; i < orders.size(); i++) {
             Order order = orders.get(i);
-            if (!order.isOccupied() && priority > order.getGeneralPriority() && !order.isDone()) {
+            if (order != null && !order.isOccupied() && priority > order.getGeneralPriority() && !order.isDone()) {
                 priority = order.getGeneralPriority();
                 orderReturn = order;
             }
         }
         return orderReturn;
     }
-
-/*    private void waitForOrders() {
-        try {
-        while (orders.isEmpty())
-                condition.await();
-        }
-        catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }*/
 
     private void waitRest() {
         try {
@@ -151,8 +148,9 @@ public class Cooker implements Runnable{
         @Override
         public void run() {
             Order order = null;
-            for (int i = 0; i < orders.size(); i++)
-                if (orders.get(i).getOrder_id() == orderId) order = orders.get(i);
+            for (int i = 0; i < orders.size(); i++) {
+                if (orders.get(i) !=null && orders.get(i).getOrder_id() == orderId) order = orders.get(i);
+            }
 
                 if (order == null) return;
 
