@@ -6,24 +6,18 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Food {
 
-    private int id;
-
+    private final int id;
+    private final ReentrantLock lock = new ReentrantLock();
     private String name;
-
     private int preparation_time;
-
     private int complexity;
-
     private Apparatus cooking_apparatus;
-
     private Boolean isPreparing = false;
-
-    private ReentrantLock lock = new ReentrantLock();
 
     public Food(int id) {
         this.id = id;
 
-        switch (id){
+        switch (id) {
             case (1):
                 this.name = "pizza";
                 this.preparation_time = 20;
@@ -128,7 +122,9 @@ public class Food {
         this.isPreparing = true;
     }
 
-    public Boolean isLocked() {return lock.isLocked();}
+    public Boolean isLocked() {
+        return lock.isLocked();
+    }
 
     public Boolean tryLock() {
         return lock.tryLock();

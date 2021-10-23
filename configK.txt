@@ -1,3 +1,9 @@
-MILLISECONDS
-http://dinning-hall:8081
-6
+SECONDS
+http://localhost:8081
+4
+3
+2
+2
+1
+stoves 4
+ovens 5

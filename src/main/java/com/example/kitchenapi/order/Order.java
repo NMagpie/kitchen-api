@@ -6,22 +6,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
-import static com.example.kitchenapi.KitchenApiApplication.*;
+import static com.example.kitchenapi.KitchenApiApplication.getTimeUnit;
+import static com.example.kitchenapi.KitchenApiApplication.isAvailable;
 
 public class Order {
 
+    private final ArrayList<HashMap<String, Integer>> cooking_details;
+    private final ArrayList<Food> foods = new ArrayList<>();
     private int order_id;
     private int table_id;
     private int waiter_id;
     private ArrayList<Integer> items;
-    private ArrayList<HashMap<String,Integer>> cooking_details;
     private int priority;
     private int max_wait;
     private int pick_up_time;
     private long cooking_time;
-
     private long generalPriority;
-    private ArrayList<Food> foods = new ArrayList<>();
     private Boolean startedCooking = false;
     private Boolean finished = false;
 
@@ -88,7 +88,8 @@ public class Order {
     }
 
     public long getCooking_time() {
-        return cooking_time; }
+        return cooking_time;
+    }
 
     public ArrayList<HashMap<String, Integer>> getCooking_details() {
         return cooking_details;
@@ -116,10 +117,10 @@ public class Order {
 
     public void makeDone(int index, int cooker_id) {
         HashMap<String, Integer> detail = new HashMap<>();
-        detail.put("food_id",items.get(index));
-        detail.put("cook_id",cooker_id);
+        detail.put("food_id", items.get(index));
+        detail.put("cook_id", cooker_id);
         add(detail);
-        System.out.println("Cooker "+cooker_id+" has prepared order "+order_id+" dish "+foods.get(index).getName());
+        System.out.println("Cooker " + cooker_id + " has prepared order " + order_id + " dish " + foods.get(index).getName());
         if (isDone()) cookingFinished();
     }
 
@@ -154,11 +155,11 @@ public class Order {
         for (int i = 0; i < foods.size(); i++) {
             Food food = foods.get(i);
             if (!food.isLocked() &&
-                    food.getComplexity()<=rank &&
+                    food.getComplexity() <= rank &&
                     maxComp < food.getComplexity() &&
                     !food.isPreparing() &&
                     isAvailable(food.getCooking_apparatus())
-                    ) {
+            ) {
                 maxComp = food.getComplexity();
                 index = i;
             }
@@ -171,7 +172,7 @@ public class Order {
         for (Food food : foods)
             if (!food.isPreparing())
                 return false;
-            return true;
+        return true;
     }
 
     @Override

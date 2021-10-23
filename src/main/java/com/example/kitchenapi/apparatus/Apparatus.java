@@ -6,7 +6,7 @@ public enum Apparatus {
     Oven,
     Stove;
 
-    private ReentrantLock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
 
     public boolean tryLock() {
         return this.lock.tryLock();
@@ -16,7 +16,11 @@ public enum Apparatus {
         this.lock.unlock();
     }
 
-    public void lock() {this.lock.lock();}
+    public void lock() {
+        this.lock.lock();
+    }
 
-    public boolean isLocked() {return this.lock.isLocked();}
+    public boolean isLocked() {
+        return this.lock.isLocked();
+    }
 }
