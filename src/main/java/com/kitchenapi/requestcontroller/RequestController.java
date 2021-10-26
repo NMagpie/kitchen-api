@@ -1,7 +1,7 @@
-package com.example.kitchenapi.requestcontroller;
+package com.kitchenapi.requestcontroller;
 
-import com.example.kitchenapi.KitchenApiApplication;
-import com.example.kitchenapi.order.Order;
+import com.kitchenapi.KitchenApiApplication;
+import com.kitchenapi.order.Order;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,7 +12,6 @@ public class RequestController {
 
     @PostMapping(value = "/order", consumes = MediaType.APPLICATION_JSON_VALUE)
     public String getOrder(@RequestBody Order object) {
-        object.setGeneralPriority();
         KitchenApiApplication.orders.add(object);
         return "Success!";
     }

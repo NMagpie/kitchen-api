@@ -1,8 +1,8 @@
-package com.example.kitchenapi;
+package com.kitchenapi;
 
-import com.example.kitchenapi.apparatus.Apparatus;
-import com.example.kitchenapi.cooker.Cooker;
-import com.example.kitchenapi.order.Order;
+import com.kitchenapi.apparatus.Apparatus;
+import com.kitchenapi.cooker.Cooker;
+import com.kitchenapi.order.Order;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -19,7 +19,6 @@ public class KitchenApiApplication {
 
     public static final ArrayList<Order> orders = new ArrayList<>();
     private static final ArrayList<Cooker> cookers = new ArrayList<>();
-    //timeUnit only greater, than NANOSECONDS
     private static TimeUnit timeUnit;
     private static TimeUnit restTime;
     private static String URL;
@@ -36,11 +35,6 @@ public class KitchenApiApplication {
         if (stoves == null) stoves = new Semaphore((int) Math.round(cookersSize / 1.75), true);
         if (ovens == null) ovens = new Semaphore((int) Math.round(cookersSize / 3.5), true);
 
-        for (Cooker cooker : cookers) {
-            cooker.setOvens(ovens);
-            cooker.setStoves(stoves);
-        }
-
         if (cookers.isEmpty())
             addCookers();
 
@@ -52,10 +46,18 @@ public class KitchenApiApplication {
 
     }
 
-    public static boolean isAvailable(Apparatus apparatus) {
-        if (apparatus == null) return true;
-        if (apparatus.ordinal() == 0) return ovens.availablePermits() > 0;
-        return stoves.availablePermits() > 0;
+    public static void acquireApparatus(Apparatus apparatus) {
+        try {
+            if (apparatus == Apparatus.Oven) ovens.acquire();
+            if (apparatus == Apparatus.Stove) stoves.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void releaseApparatus(Apparatus apparatus) {
+        if (apparatus == Apparatus.Oven) ovens.release();
+        if (apparatus == Apparatus.Stove) stoves.release();
     }
 
     private static void addCookers() {
@@ -85,12 +87,11 @@ public class KitchenApiApplication {
     private static void initialization() throws InterruptedException {
         File config = new File("configK.txt");
 
-        Scanner scanner = null;
-
-        String str;
-
         try {
-            scanner = new Scanner(config);
+
+            String str;
+
+            Scanner scanner = new Scanner(config);
 
             str = scanner.nextLine();
 
@@ -126,27 +127,21 @@ public class KitchenApiApplication {
 
             if (cookers.size() != 0 && cookers.size() != cookersSize) parsingError(4);
 
+            scanner.close();
+
         } catch (NoSuchElementException e) {
             parsingError(0);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
             parsingError(1);
         } catch (FileNotFoundException e) {
             parsingError(-1);
-        }
-
-        scanner.close();
-
-        if (timeUnit.ordinal() == 0) {
-            System.out.println("Wrong timeUnit input. Exiting program...");
-            TimeUnit.SECONDS.sleep(10);
-            System.exit(1);
         }
 
         if (timeUnit.ordinal() < 3) {
             System.out.println("!WARNING! The app supports timeUnits less, than seconds," +
                     " but some POST requests can be sent for more, than 200 ms, so the" +
                     " rating of the restaurant can be lowered to 0*!");
-            TimeUnit.SECONDS.sleep(10);
+            TimeUnit.SECONDS.sleep(1);
         }
     }
 
@@ -168,7 +163,6 @@ public class KitchenApiApplication {
                 System.out.println("\"configK.txt\" file have to be in the same directory as jar file or project");
                 TimeUnit.SECONDS.sleep(10);
                 System.exit(1);
-                break;
             case 0:
                 System.out.println("ERROR: WRONG NUMBER OF LINES");
                 break;

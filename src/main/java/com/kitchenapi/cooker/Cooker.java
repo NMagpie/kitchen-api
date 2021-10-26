@@ -1,8 +1,11 @@
-package com.example.kitchenapi.cooker;
+package com.kitchenapi.cooker;
 
-import com.example.kitchenapi.apparatus.Apparatus;
-import com.example.kitchenapi.order.Order;
-import org.json.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kitchenapi.KitchenApiApplication;
+import com.kitchenapi.apparatus.Apparatus;
+import com.kitchenapi.food.Food;
+import com.kitchenapi.order.Order;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -10,13 +13,12 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.concurrent.Semaphore;
-
-import static com.example.kitchenapi.KitchenApiApplication.*;
+import static com.kitchenapi.KitchenApiApplication.acquireApparatus;
+import static com.kitchenapi.KitchenApiApplication.releaseApparatus;
 
 public class Cooker implements Runnable {
 
-    private static final String url = getURL() + "/distribution";
+    private static final String url = KitchenApiApplication.getURL() + "/distribution";
     private static final HttpHeaders headers = new HttpHeaders() {{
         setContentType(MediaType.APPLICATION_JSON);
     }};
@@ -25,8 +27,6 @@ public class Cooker implements Runnable {
     private final int rank;
     private final String name = "Cook";
     private final String catchPhrase = "Kek";
-    private Semaphore ovens;
-    private Semaphore stoves;
     private final RestTemplate restTemplate = new RestTemplateBuilder().build();
     private int proficiency;
 
@@ -45,29 +45,25 @@ public class Cooker implements Runnable {
         this.proficiency = rank + a;
     }
 
-    public void setOvens(Semaphore ovens) {
-        this.ovens = ovens;
-    }
-
-    public void setStoves(Semaphore stoves) {
-        this.stoves = stoves;
-    }
-
     public static synchronized void noResponse() {
         System.out.println("No response! Exiting program...");
         System.exit(0);
     }
 
     public void sendOrder(Order order) {
-        JSONObject object = new JSONObject(order);
+        ObjectMapper mapper = new ObjectMapper();
 
-        object.remove("generalPriority");
-        object.remove("foods");
-        object.remove("startedCooking");
-        object.remove("occupied");
-        object.remove("done");
+        String json = null;
 
-        HttpEntity<String> request = new HttpEntity<>(object.toString(), headers);
+        try {
+            json = mapper.writeValueAsString(order);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println(json);
+
+        HttpEntity<String> request = new HttpEntity<>(json, headers);
         try {
             restTemplate.postForObject(url, request, String.class);
         } catch (ResourceAccessException e) {
@@ -79,9 +75,9 @@ public class Cooker implements Runnable {
     private Order getMaxPriority() {
         Order orderReturn = null;
         long priority = Long.MAX_VALUE;
-        for (int i = 0; i < orders.size(); i++) {
-            Order order = orders.get(i);
-            if (order != null && !order.isOccupied() && !order.isDone() && priority > order.getGeneralPriority()) {
+        for (int i = 0; i < KitchenApiApplication.orders.size(); i++) {
+            Order order = KitchenApiApplication.orders.get(i);
+            if (order != null && !order.isOccupied() && priority > order.getGeneralPriority()) {
                 priority = order.getGeneralPriority();
                 orderReturn = order;
             }
@@ -91,7 +87,7 @@ public class Cooker implements Runnable {
 
     private void waitRest() {
         try {
-            getRestTime().sleep(10);
+            KitchenApiApplication.getRestTime().sleep(10);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -103,23 +99,21 @@ public class Cooker implements Runnable {
 
         Order order;
 
-        int food;
+        Food food;
 
         Thread.currentThread().setName("Cooker-" + id);
 
         while (true) {
 
-            if (!orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
-
+            if (!KitchenApiApplication.orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
                 food = order.getFoodToCook(rank);
 
-                if (!order.getFoods().get(food).isPreparing() && order.getFoods().get(food).tryLock()) {
-                    order.getFoods().get(food).makePreparing();
-                    System.out.println("Cooker " + id + " is preparing order " + order.getOrder_id() + " dish " + order.getFoods().get(food).getName());
+                if (food != null) {
+                    System.out.println("Cooker " + id + " is preparing order " + order.getOrder_id() + " dish " + food.getName());
                     if (!order.startedCooking()) order.startCooking();
                     proficiency--;
                     new Thread(new Cooking(order.getOrder_id(), food)).start();
-                    order.getFoods().get(food).unlock();
+                    food.unlock();
                 }
 
             }
@@ -144,9 +138,9 @@ public class Cooker implements Runnable {
 
         private final int orderId;
 
-        private final int food;
+        private final Food food;
 
-        public Cooking(int order, int food) {
+        public Cooking(int order, Food food) {
             this.orderId = order;
             this.food = food;
         }
@@ -155,46 +149,32 @@ public class Cooker implements Runnable {
         public void run() {
             Thread.currentThread().setName("Cooking-" + id);
             Order order = null;
-            for (int i = 0; i < orders.size(); i++) {
-                if (orders.get(i) != null && orders.get(i).getOrder_id() == orderId) order = orders.get(i);
+            for (int i = 0; i < KitchenApiApplication.orders.size(); i++) {
+                if (KitchenApiApplication.orders.get(i) != null && KitchenApiApplication.orders.get(i).getOrder_id() == orderId)
+                    order = KitchenApiApplication.orders.get(i);
             }
 
             if (order == null) return;
 
-            Apparatus apparatus = order.getFoods().get(food).getCooking_apparatus();
+            Apparatus apparatus = food.getCooking_apparatus();
 
-            if (apparatus != null)
-                if (apparatus.ordinal() == 0) {
-                    try {
-                        ovens.acquire();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    try {
-                        stoves.acquire();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
+            acquireApparatus(apparatus);
 
             try {
-                getTimeUnit().sleep(order.getFoods().get(food).getPreparation_time());
+                KitchenApiApplication.getTimeUnit().sleep(food.getPreparation_time());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            if (apparatus != null)
-                if (apparatus.ordinal() == 0) ovens.release();
-                else stoves.release();
+            releaseApparatus(apparatus);
 
             order.makeDone(food, id);
             proficiency++;
 
-            if (!orders.isEmpty() && order.isDone() && orders.contains(order)) {
-                orders.remove(order);
+            if (order.isDone() && KitchenApiApplication.orders.contains(order)) {
+                KitchenApiApplication.orders.remove(order);
                 sendOrder(order);
-                System.out.println("Order " + order.getOrder_id() + " was prepared sent back within " + order.getCooking_time() + " " + getTimeUnit().name() + "\n");
+                System.out.println("Order " + order.getOrder_id() + " was prepared sent back within " + order.getCooking_time() + " " + KitchenApiApplication.getTimeUnit().name() + "\n");
             }
         }
     }

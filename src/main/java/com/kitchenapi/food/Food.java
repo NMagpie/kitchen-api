@@ -1,6 +1,6 @@
-package com.example.kitchenapi.food;
+package com.kitchenapi.food;
 
-import com.example.kitchenapi.apparatus.Apparatus;
+import com.kitchenapi.apparatus.Apparatus;
 
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -126,11 +126,12 @@ public class Food {
         return lock.isLocked();
     }
 
-    public Boolean tryLock() {
+    public boolean tryLock() {
         return lock.tryLock();
     }
 
     public void unlock() {
+        //if (lock.isHeldByCurrentThread())
         lock.unlock();
     }
 }
