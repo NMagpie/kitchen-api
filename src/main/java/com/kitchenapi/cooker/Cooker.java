@@ -51,6 +51,9 @@ public class Cooker implements Runnable {
     }
 
     public void sendOrder(Order order) {
+
+        //TODO change the postRequest
+
         ObjectMapper mapper = new ObjectMapper();
 
         String json = null;
@@ -73,19 +76,27 @@ public class Cooker implements Runnable {
     }
 
     private Order getMaxPriority() {
+
         Order orderReturn = null;
+
         long priority = Long.MAX_VALUE;
+
         for (int i = 0; i < KitchenApiApplication.orders.size(); i++) {
+
             Order order = KitchenApiApplication.orders.get(i);
+
             if (order != null && !order.isOccupied() && priority > order.getGeneralPriority()) {
                 priority = order.getGeneralPriority();
                 orderReturn = order;
             }
+
         }
+
         return orderReturn;
     }
 
     private void waitRest() {
+
         try {
             KitchenApiApplication.getRestTime().sleep(10);
         } catch (InterruptedException e) {
@@ -106,13 +117,18 @@ public class Cooker implements Runnable {
         while (true) {
 
             if (!KitchenApiApplication.orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
+
                 food = order.getFoodToCook(rank);
 
                 if (food != null) {
                     System.out.println("Cooker " + id + " is preparing order " + order.getOrder_id() + " dish " + food.getName());
+
                     if (!order.startedCooking()) order.startCooking();
+
                     proficiency--;
-                    new Thread(new Cooking(order.getOrder_id(), food)).start();
+
+                    new Thread(new Cooking(order, food)).start();
+
                     food.unlock();
                 }
 
@@ -136,25 +152,19 @@ public class Cooker implements Runnable {
 
     private class Cooking implements Runnable {
 
-        private final int orderId;
+        private final Order order;
 
         private final Food food;
 
-        public Cooking(int order, Food food) {
-            this.orderId = order;
+        public Cooking(Order order, Food food) {
+            this.order = order;
             this.food = food;
         }
 
         @Override
         public void run() {
-            Thread.currentThread().setName("Cooking-" + id);
-            Order order = null;
-            for (int i = 0; i < KitchenApiApplication.orders.size(); i++) {
-                if (KitchenApiApplication.orders.get(i) != null && KitchenApiApplication.orders.get(i).getOrder_id() == orderId)
-                    order = KitchenApiApplication.orders.get(i);
-            }
 
-            if (order == null) return;
+            Thread.currentThread().setName("Cooking-" + id);
 
             Apparatus apparatus = food.getCooking_apparatus();
 
@@ -169,12 +179,14 @@ public class Cooker implements Runnable {
             releaseApparatus(apparatus);
 
             order.makeDone(food, id);
+
             proficiency++;
 
-            if (order.isDone() && KitchenApiApplication.orders.contains(order)) {
-                KitchenApiApplication.orders.remove(order);
+            if (order.wrapForOrder()) {
+
                 sendOrder(order);
-                System.out.println("Order " + order.getOrder_id() + " was prepared sent back within " + order.getCooking_time() + " " + KitchenApiApplication.getTimeUnit().name() + "\n");
+
+                System.out.println("Order " + order.getOrder_id() + " was prepared; sent back within " + order.getCooking_time() + " " + KitchenApiApplication.getTimeUnit().name() + "\n");
             }
         }
     }

@@ -10,10 +10,12 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.kitchenapi.KitchenApiApplication.getTimeUnit;
+import static com.kitchenapi.KitchenApiApplication.orders;
 
-@JsonIgnoreProperties({"foods", "generalPriority", "startedCooking", "finished"})
+@JsonIgnoreProperties({"foods", "generalPriority", "startedCooking", "finished", "lock"})
 public class Order {
 
     @JsonProperty
@@ -36,27 +38,32 @@ public class Order {
     private final double max_wait;
 
     @JsonProperty
-    private final int pick_up_time;
+    private final long pick_up_time;
+
     @JsonProperty
     private final ArrayList<HashMap<String, Integer>> cooking_details;
+
     @Getter
     private final ArrayList<Food> foods = new ArrayList<>();
+
     @Getter
     private final long generalPriority;
+    private final ReentrantLock lock = new ReentrantLock();
     @JsonProperty
     @Getter
     private long cooking_time;
     @Getter
     private Boolean startedCooking = false;
+    @Getter
     private Boolean finished = false;
 
     @JsonCreator
-    public Order(@JsonProperty("order_id")     int order_id,
-                 @JsonProperty("table_id")     int table_id,
-                 @JsonProperty("waiter_id")    int waiter_id,
-                 @JsonProperty("items")        ArrayList<Integer> items,
-                 @JsonProperty("priority")     int priority,
-                 @JsonProperty("max_wait")     double max_wait,
+    public Order(@JsonProperty("order_id") int order_id,
+                 @JsonProperty("table_id") int table_id,
+                 @JsonProperty("waiter_id") int waiter_id,
+                 @JsonProperty("items") ArrayList<Integer> items,
+                 @JsonProperty("priority") int priority,
+                 @JsonProperty("max_wait") double max_wait,
                  @JsonProperty("pick_up_time") int pick_up_time) {
 
         this.order_id = order_id;
@@ -82,7 +89,7 @@ public class Order {
     }
 
     @JsonIgnore
-    public Boolean isDone() {
+    private Boolean isDone() {
         return cooking_details.size() == items.size();
     }
 
@@ -99,6 +106,15 @@ public class Order {
         cooking_details.add(detail);
     }
 
+    public boolean wrapForOrder() {
+        if (finished && lock.tryLock() && orders.contains(this)) {
+            orders.remove(this);
+            lock.unlock();
+            return true;
+        }
+        return false;
+    }
+
     public Boolean startedCooking() {
         return startedCooking;
     }
@@ -109,21 +125,24 @@ public class Order {
     }
 
     public Food getFoodToCook(int rank) {
+
         int maxComp = 0;
         Food foodToCook = null;
-        for (Food food : foods) {
+
+        for (Food food : foods)
             if (!food.isPreparing() &&
                     food.getComplexity() <= rank &&
                     maxComp < food.getComplexity() &&
-                    food.tryLock()
-            ) {
+                    food.tryLock()) {
+
                 if (foodToCook != null) foodToCook.unlock();
                 maxComp = food.getComplexity();
                 foodToCook = food;
+
             }
-        }
-        if (foodToCook != null)
-            foodToCook.makePreparing();
+
+        if (foodToCook != null) foodToCook.makePreparing();
+
         return foodToCook;
     }
 

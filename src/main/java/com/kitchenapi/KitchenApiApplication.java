@@ -18,12 +18,19 @@ import java.util.concurrent.TimeUnit;
 public class KitchenApiApplication {
 
     public static final ArrayList<Order> orders = new ArrayList<>();
+
     private static final ArrayList<Cooker> cookers = new ArrayList<>();
+
     private static TimeUnit timeUnit;
+
     private static TimeUnit restTime;
+
     private static String URL;
+
     private static Semaphore stoves;
+
     private static Semaphore ovens;
+    
     private static int cookersSize;
 
     public static void main(String[] args) throws InterruptedException {

@@ -1,17 +1,29 @@
 package com.kitchenapi.food;
 
 import com.kitchenapi.apparatus.Apparatus;
+import lombok.Getter;
 
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Food {
 
+    @Getter
     private final int id;
+
     private final ReentrantLock lock = new ReentrantLock();
+
+    @Getter
     private String name;
+
+    @Getter
     private int preparation_time;
+
+    @Getter
     private int complexity;
+
+    @Getter
     private Apparatus cooking_apparatus;
+
     private Boolean isPreparing = false;
 
     public Food(int id) {
@@ -94,36 +106,12 @@ public class Food {
 
     }
 
-    public int getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public int getPreparation_time() {
-        return preparation_time;
-    }
-
-    public int getComplexity() {
-        return complexity;
-    }
-
-    public Apparatus getCooking_apparatus() {
-        return cooking_apparatus;
-    }
-
-    public Boolean isPreparing() {
-        return isPreparing;
-    }
-
     public void makePreparing() {
         this.isPreparing = true;
     }
 
-    public Boolean isLocked() {
-        return lock.isLocked();
+    public Boolean isPreparing() {
+        return isPreparing;
     }
 
     public boolean tryLock() {
@@ -131,7 +119,6 @@ public class Food {
     }
 
     public void unlock() {
-        //if (lock.isHeldByCurrentThread())
         lock.unlock();
     }
 }
