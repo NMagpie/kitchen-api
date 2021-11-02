@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.Semaphore;
@@ -30,12 +31,12 @@ public class KitchenApiApplication {
     private static Semaphore stoves;
 
     private static Semaphore ovens;
-    
+
     private static int cookersSize;
 
-    public static void main(String[] args) throws InterruptedException {
+    private static final SpringApplication app = new SpringApplication(KitchenApiApplication.class);
 
-        SpringApplication.run(KitchenApiApplication.class, args);
+    public static void main(String[] args) throws InterruptedException {
 
         initialization();
 
@@ -43,13 +44,29 @@ public class KitchenApiApplication {
         if (ovens == null) ovens = new Semaphore((int) Math.round(cookersSize / 3.5), true);
 
         if (cookers.isEmpty())
-            addCookers();
+            createCookers();
 
         for (Cooker cooker : cookers) {
             System.out.println(cooker);
         }
 
         System.out.println("Ovens: " + ovens.availablePermits() + ", Stoves: " + stoves.availablePermits());
+
+    }
+
+
+    private static void createApparatus(String str) throws InterruptedException {
+        if (str.matches("^ovens \\d+$") && ovens == null) {
+            ovens = new Semaphore(Integer.parseInt(str.split(" ")[1]), true);
+            return;
+        }
+
+        if (str.matches("^stoves \\d+$") && stoves == null) {
+            stoves = new Semaphore(Integer.parseInt(str.split(" ")[1]), true);
+            return;
+        }
+
+        parsingError(0);
 
     }
 
@@ -67,15 +84,25 @@ public class KitchenApiApplication {
         if (apparatus == Apparatus.Stove) stoves.release();
     }
 
-    private static void addCookers() {
+    private static void createCookers() {
         //at least one Cooker Chief so if there will be only one cooker, thus kitchen can work properly.
-        cookers.add(new Cooker(3));
-        new Thread(cookers.get(0)).start();
+        Cooker cooker = new Cooker(3);
+        cooker.start();
+        cookers.add(cooker);
         cookersSize--;
         while (cookersSize > 0) {
-            cookers.add(new Cooker());
-            new Thread(cookers.get(cookers.size() - 1)).start();
+            cooker = new Cooker();
+            cooker.start();
+            cookers.add(cooker);
             cookersSize--;
+        }
+    }
+
+    private static void addCookers(int rank, int number) {
+        for (int i = 0; i < number; i++) {
+            Cooker cooker = new Cooker(rank);
+            cooker.start();
+            cookers.add(cooker);
         }
     }
 
@@ -104,35 +131,49 @@ public class KitchenApiApplication {
 
             timeUnit = TimeUnit.valueOf(str);
 
-            URL = scanner.nextLine();
+            String port = scanner.nextLine();
 
-            if (!URL.matches("((https?://[\\w-]+)|(((https?://)?\\d{1,3}\\.){3}(\\d{1,3})(/\\d+)?)):\\d{4}"))
-                parsingError(2);
+            if (!port.matches("^\\d{4}$")) parsingError(2);
 
-            str = scanner.nextLine();
+            app.setDefaultProperties(Collections.singletonMap("server.port",port));
 
-            if (isNumber(str)) cookersSize = Integer.parseInt(str);
-            else parsingError(3);
-
-            if (cookersSize < 1) parsingError(3);
+            app.run();
 
             restTime = TimeUnit.values()[timeUnit.ordinal() - 1];
 
-            str = scanner.nextLine();
+            URL = scanner.nextLine();
 
-            while (isNumber(str)) {
-                cookers.add(new Cooker(Integer.parseInt(str)));
-                new Thread(cookers.get(cookers.size() - 1)).start();
+            if (!URL.matches("((https?://[\\w-]+)|(((https?://)?\\d{1,3}\\.){3}(\\d{1,3})(/\\d+)?)):\\d{4}"))
+                parsingError(3);
+
+            if (scanner.hasNextLine()) str = scanner.nextLine();
+
+            if (isNumberLine(str)) {
+
+                String[] stringInts = str.split(" ");
+
+                for (int i = 0; i < 3; i++) {
+                    int number = Integer.parseInt(stringInts[i]);
+                    addCookers(i + 1, number);
+                }
+
+                cookersSize = cookers.size();
+
                 if (scanner.hasNextLine()) str = scanner.nextLine();
-                else str = null;
+
+            } else if (isNumber(str)) {
+
+                cookersSize = Integer.parseInt(str);
+
+                if (scanner.hasNextLine()) str = scanner.nextLine();
+
             }
 
-            if (str != null) {
-                createApparatus(str);
-                if (scanner.hasNextLine()) createApparatus(scanner.nextLine());
-            }
+            if (cookersSize == 0) parsingError(4);
 
-            if (cookers.size() != 0 && cookers.size() != cookersSize) parsingError(4);
+            createApparatus(str);
+
+            if (scanner.hasNextLine()) createApparatus(scanner.nextLine());
 
             scanner.close();
 
@@ -152,6 +193,11 @@ public class KitchenApiApplication {
         }
     }
 
+    private static boolean isNumberLine(String str) {
+        if (str == null) return false;
+        return str.matches("^\\d+ \\d+ \\d+$");
+    }
+
     private static boolean isNumber(String str) {
         if (str == null) return false;
         return str.matches("^\\d+$");
@@ -160,11 +206,11 @@ public class KitchenApiApplication {
     private static void parsingError(int intCase) throws InterruptedException {
         System.out.println("Wrong data in config-file! Config file has to contain by lines:" +
                 "\n1. Time units by capslock (e.g. MILLISECONDS, SECONDS, MICROSECONDS)" +
-                "\n2. IPv4 address or URL of DinningHall and its port (e.g. http://localhost:8081)" +
-                "\n3. Number of Cookers in Kitchen (integer)" +
-                "\n4. (Optional) Rank of every cooker on new line" +
-                "\n5. Number of ovens written as \"ovens %integer%\"" +
-                "\n6. Number of stoves written as \"stoves %integer%\"");
+                "\n2. Free port to be reserved for this server" +
+                "\n3. IPv4 address or URL of DinningHall and its port (e.g. http://localhost:8081)" +
+                "\n4. Number of cookers OR Three integers represent number of cookers for every rank (e.g. first integer - rank one and so on)" +
+                "\n5. (Optional) Number of ovens written as \"ovens %integer%\"" +
+                "\n6. (Optional) Number of stoves written as \"stoves %integer%\"");
         switch (intCase) {
             case -1:
                 System.out.println("\"configK.txt\" file have to be in the same directory as jar file or project");
@@ -177,34 +223,19 @@ public class KitchenApiApplication {
                 System.out.println("ERROR IN LINE 1: TIMEUNITS");
                 break;
             case 2:
-                System.out.println("ERROR IN LINE 2: ADDRESS OR IP");
+                System.out.println("ERROR IN LINE 2: Port of this server");
                 break;
             case 3:
-                System.out.println("ERROR IN LINE 3: NUMBER OF COOKERS");
+                System.out.println("ERROR IN LINE 3: ADDRESS OR IP");
                 break;
             case 4:
-                System.out.println("ERROR: NO CORRESPONDENCE BETWEEN NUMBER OF COOKERS AND THEIR RANKS");
+                System.out.println("ERROR IN LINE 4: Numbers of cookers");
                 break;
         }
 
         TimeUnit.SECONDS.sleep(20);
 
         System.exit(1);
-    }
-
-    private static void createApparatus(String str) throws InterruptedException {
-        if (str.matches("^ovens \\d+$") && ovens == null) {
-            ovens = new Semaphore(Integer.parseInt(str.split(" ")[1]), true);
-            return;
-        }
-
-        if (str.matches("^stoves \\d+$") && stoves == null) {
-            stoves = new Semaphore(Integer.parseInt(str.split(" ")[1]), true);
-            return;
-        }
-
-        parsingError(0);
-
     }
 
 }

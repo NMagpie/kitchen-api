@@ -16,7 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import static com.kitchenapi.KitchenApiApplication.acquireApparatus;
 import static com.kitchenapi.KitchenApiApplication.releaseApparatus;
 
-public class Cooker implements Runnable {
+public class Cooker extends Thread {
 
     private static final String url = KitchenApiApplication.getURL() + "/distribution";
     private static final HttpHeaders headers = new HttpHeaders() {{
@@ -32,7 +32,7 @@ public class Cooker implements Runnable {
 
     public Cooker() {
         int a = 0;
-        this.rank = (int) (Math.random() * 2 + 1);
+        this.rank = (int) (Math.random() * 3 + 1);
         if (Math.random() > 0.7) a++;
         this.proficiency = rank + a;
         //this.proficiency = rank + (int) (Math.round(Math.random()));
@@ -52,8 +52,6 @@ public class Cooker implements Runnable {
 
     public void sendOrder(Order order) {
 
-        //TODO change the postRequest
-
         ObjectMapper mapper = new ObjectMapper();
 
         String json = null;
@@ -63,8 +61,6 @@ public class Cooker implements Runnable {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
-
-        System.out.println(json);
 
         HttpEntity<String> request = new HttpEntity<>(json, headers);
         try {
@@ -85,7 +81,7 @@ public class Cooker implements Runnable {
 
             Order order = KitchenApiApplication.orders.get(i);
 
-            if (order != null && !order.isOccupied() && priority > order.getGeneralPriority()) {
+            if (order != null && !order.isOccupied(rank) && priority > order.getGeneralPriority()) {
                 priority = order.getGeneralPriority();
                 orderReturn = order;
             }

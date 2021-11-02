@@ -147,6 +147,13 @@ public class Order {
     }
 
     @JsonIgnore
+    public Boolean isOccupied(int rank) {
+        //foods.stream().noneMatch(food -> !food.isPreparing() && food.getComplexity() <= rank);
+        //foods.stream().allMatch(food -> (food.isPreparing() || food.getComplexity() > rank) );
+        return foods.stream().noneMatch(food -> !food.isPreparing() && food.getComplexity() <= rank);
+    }
+
+    @JsonIgnore
     public Boolean isOccupied() {
         return foods.stream().allMatch(Food::isPreparing);
     }
