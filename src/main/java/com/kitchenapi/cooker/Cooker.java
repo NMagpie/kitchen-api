@@ -1,15 +1,15 @@
 package com.kitchenapi.cooker;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kitchenapi.KitchenApiApplication;
 import com.kitchenapi.apparatus.Apparatus;
-import com.kitchenapi.food.Food;
+import com.kitchenapi.food.Foods;
 import com.kitchenapi.order.Order;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
@@ -52,20 +52,11 @@ public class Cooker extends Thread {
 
     public void sendOrder(Order order) {
 
-        ObjectMapper mapper = new ObjectMapper();
+        HttpEntity<Order> request = new HttpEntity<>(order, headers);
 
-        String json = null;
-
-        try {
-            json = mapper.writeValueAsString(order);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-        }
-
-        HttpEntity<String> request = new HttpEntity<>(json, headers);
         try {
             restTemplate.postForObject(url, request, String.class);
-        } catch (ResourceAccessException e) {
+        } catch (ResourceAccessException | HttpServerErrorException | HttpClientErrorException e) {
             noResponse();
         }
 
@@ -106,26 +97,27 @@ public class Cooker extends Thread {
 
         Order order;
 
-        Food food;
+        Foods foods;
 
         Thread.currentThread().setName("Cooker-" + id);
 
         while (true) {
 
-            if (!KitchenApiApplication.orders.isEmpty() && (order = getMaxPriority()) != null && proficiency > 0) {
+            if ((order = getMaxPriority()) != null && proficiency > 0) {
 
-                food = order.getFoodToCook(rank);
+                foods = order.getFoodToCook(rank);
 
-                if (food != null) {
-                    System.out.println("Cooker " + id + " is preparing order " + order.getOrder_id() + " dish " + food.getName());
+                if (foods != null) {
+
+                    System.out.println("Cooker " + id + " is preparing order " + order.getOrder_id() + " dish " + foods.getName());
 
                     if (!order.startedCooking()) order.startCooking();
 
                     proficiency--;
 
-                    new Thread(new Cooking(order, food)).start();
+                    new Thread(new Cooking(order, foods)).start();
 
-                    food.unlock();
+                    foods.unlock();
                 }
 
             }
@@ -150,11 +142,11 @@ public class Cooker extends Thread {
 
         private final Order order;
 
-        private final Food food;
+        private final Foods foods;
 
-        public Cooking(Order order, Food food) {
+        public Cooking(Order order, Foods foods) {
             this.order = order;
-            this.food = food;
+            this.foods = foods;
         }
 
         @Override
@@ -162,19 +154,19 @@ public class Cooker extends Thread {
 
             Thread.currentThread().setName("Cooking-" + id);
 
-            Apparatus apparatus = food.getCooking_apparatus();
+            Apparatus apparatus = foods.getCooking_apparatus();
 
             acquireApparatus(apparatus);
 
             try {
-                KitchenApiApplication.getTimeUnit().sleep(food.getPreparation_time());
+                KitchenApiApplication.getTimeUnit().sleep(foods.getPreparation_time());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
             releaseApparatus(apparatus);
 
-            order.makeDone(food, id);
+            order.makeDone(foods, id);
 
             proficiency++;
 
