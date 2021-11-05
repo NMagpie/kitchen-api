@@ -1,13 +1,19 @@
 package com.kitchenapi;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kitchenapi.apparatus.Apparatus;
 import com.kitchenapi.cooker.Cooker;
+import com.kitchenapi.food.Foods;
 import com.kitchenapi.order.Order;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.NoSuchElementException;
@@ -21,20 +27,13 @@ public class KitchenApiApplication {
     public static final ArrayList<Order> orders = new ArrayList<>();
 
     private static final ArrayList<Cooker> cookers = new ArrayList<>();
-
-    private static TimeUnit timeUnit;
-
-    private static TimeUnit restTime;
-
-    private static String URL;
-
-    private static Semaphore stoves;
-
-    private static Semaphore ovens;
-
-    private static int cookersSize;
-
     private static final SpringApplication app = new SpringApplication(KitchenApiApplication.class);
+    private static TimeUnit timeUnit;
+    private static TimeUnit restTime;
+    private static String URL;
+    private static Semaphore stoves;
+    private static Semaphore ovens;
+    private static int cookersSize;
 
     public static void main(String[] args) throws InterruptedException {
 
@@ -70,18 +69,24 @@ public class KitchenApiApplication {
 
     }
 
+    public static Boolean isApparatusFree(Apparatus apparatus) {
+        if (apparatus == Apparatus.oven) return ovens.availablePermits() > 0;
+        if (apparatus == Apparatus.stove) return stoves.availablePermits() > 0;
+        return true;
+    }
+
     public static void acquireApparatus(Apparatus apparatus) {
         try {
-            if (apparatus == Apparatus.Oven) ovens.acquire();
-            if (apparatus == Apparatus.Stove) stoves.acquire();
+            if (apparatus == Apparatus.oven) ovens.acquire();
+            if (apparatus == Apparatus.stove) stoves.acquire();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
     public static void releaseApparatus(Apparatus apparatus) {
-        if (apparatus == Apparatus.Oven) ovens.release();
-        if (apparatus == Apparatus.Stove) stoves.release();
+        if (apparatus == Apparatus.oven) ovens.release();
+        if (apparatus == Apparatus.stove) stoves.release();
     }
 
     private static void createCookers() {
@@ -133,9 +138,9 @@ public class KitchenApiApplication {
 
             String port = scanner.nextLine();
 
-            if (!port.matches("^\\d{4}$")) parsingError(2);
+            if (!port.matches("^\\d{4,5}$")) parsingError(2);
 
-            app.setDefaultProperties(Collections.singletonMap("server.port",port));
+            app.setDefaultProperties(Collections.singletonMap("server.port", port));
 
             app.run();
 
@@ -143,7 +148,7 @@ public class KitchenApiApplication {
 
             URL = scanner.nextLine();
 
-            if (!URL.matches("((https?://[\\w-]+)|(((https?://)?\\d{1,3}\\.){3}(\\d{1,3})(/\\d+)?)):\\d{4}"))
+            if (!URL.matches("((https?://[\\w-]+)|(((https?://)?\\d{1,3}\\.){3}(\\d{1,3})(/\\d+)?)):\\d{4,5}"))
                 parsingError(3);
 
             if (scanner.hasNextLine()) str = scanner.nextLine();
@@ -177,6 +182,8 @@ public class KitchenApiApplication {
 
             scanner.close();
 
+            parseMenu();
+
         } catch (NoSuchElementException e) {
             parsingError(0);
         } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
@@ -203,8 +210,22 @@ public class KitchenApiApplication {
         return str.matches("^\\d+$");
     }
 
+    private static void parseMenu() throws InterruptedException {
+        try {
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            mapper.readValue(Paths.get("menu.json").toFile(), Foods[].class);
+
+        } catch (JsonMappingException | JsonParseException e) {
+            parsingError(-3);
+        } catch (IOException e) {
+            parsingError(-2);
+        }
+    }
+
     private static void parsingError(int intCase) throws InterruptedException {
-        System.out.println("Wrong data in config-file! Config file has to contain by lines:" +
+        if (intCase > -1) System.out.println("Wrong data in config-file! Config file has to contain by lines:" +
                 "\n1. Time units by capslock (e.g. MILLISECONDS, SECONDS, MICROSECONDS)" +
                 "\n2. Free port to be reserved for this server" +
                 "\n3. IPv4 address or URL of DinningHall and its port (e.g. http://localhost:8081)" +
@@ -212,10 +233,15 @@ public class KitchenApiApplication {
                 "\n5. (Optional) Number of ovens written as \"ovens %integer%\"" +
                 "\n6. (Optional) Number of stoves written as \"stoves %integer%\"");
         switch (intCase) {
+            case -3:
+                System.out.println("ERROR: PARSING MENU");
+                break;
+            case -2:
+                System.out.println("\"menu.json\" file have to be in the same directory as jar file or project");
+                break;
             case -1:
                 System.out.println("\"configK.txt\" file have to be in the same directory as jar file or project");
-                TimeUnit.SECONDS.sleep(10);
-                System.exit(1);
+                break;
             case 0:
                 System.out.println("ERROR: WRONG NUMBER OF LINES");
                 break;
@@ -233,7 +259,7 @@ public class KitchenApiApplication {
                 break;
         }
 
-        TimeUnit.SECONDS.sleep(20);
+        TimeUnit.SECONDS.sleep(10);
 
         System.exit(1);
     }

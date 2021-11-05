@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kitchenapi.food.Food;
+import com.kitchenapi.food.Foods;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -12,8 +12,7 @@ import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static com.kitchenapi.KitchenApiApplication.getTimeUnit;
-import static com.kitchenapi.KitchenApiApplication.orders;
+import static com.kitchenapi.KitchenApiApplication.*;
 
 @JsonIgnoreProperties({"foods", "generalPriority", "startedCooking", "finished", "lock"})
 public class Order {
@@ -44,7 +43,7 @@ public class Order {
     private final ArrayList<HashMap<String, Integer>> cooking_details;
 
     @Getter
-    private final ArrayList<Food> foods = new ArrayList<>();
+    private final ArrayList<Foods> foods = new ArrayList<>();
 
     @Getter
     private final long generalPriority;
@@ -76,7 +75,7 @@ public class Order {
         this.cooking_details = new ArrayList<>();
 
         for (Integer item : items)
-            foods.add(new Food(item));
+            foods.add(new Foods(item));
 
         this.generalPriority = pick_up_time - priority;
     }
@@ -93,12 +92,12 @@ public class Order {
         return cooking_details.size() == items.size();
     }
 
-    public void makeDone(Food food, int cooker_id) {
+    public void makeDone(Foods foods, int cooker_id) {
         HashMap<String, Integer> detail = new HashMap<>();
-        detail.put("food_id", food.getId());
+        detail.put("food_id", foods.getId());
         detail.put("cook_id", cooker_id);
         add(detail);
-        System.out.println("Cooker " + cooker_id + " has prepared order " + order_id + " dish " + food.getName());
+        System.out.println("Cooker " + cooker_id + " has prepared order " + order_id + " dish " + foods.getName());
         if (isDone()) cookingFinished();
     }
 
@@ -124,38 +123,33 @@ public class Order {
         this.startedCooking = true;
     }
 
-    public Food getFoodToCook(int rank) {
+    public Foods getFoodToCook(int rank) {
 
         int maxComp = 0;
-        Food foodToCook = null;
 
-        for (Food food : foods)
-            if (!food.isPreparing() &&
-                    food.getComplexity() <= rank &&
-                    maxComp < food.getComplexity() &&
-                    food.tryLock()) {
+        Foods foodsToCook = null;
 
-                if (foodToCook != null) foodToCook.unlock();
-                maxComp = food.getComplexity();
-                foodToCook = food;
+        for (Foods foods : this.foods)
+            if (!foods.isPreparing() &&
+                    foods.getComplexity() <= rank &&
+                    maxComp < foods.getComplexity() &&
+                    foods.tryLock() &&
+                    isApparatusFree(foods.getCooking_apparatus())) {
+
+                if (foodsToCook != null) foodsToCook.unlock();
+                maxComp = foods.getComplexity();
+                foodsToCook = foods;
 
             }
 
-        if (foodToCook != null) foodToCook.makePreparing();
+        if (foodsToCook != null) foodsToCook.makePreparing();
 
-        return foodToCook;
+        return foodsToCook;
     }
 
     @JsonIgnore
     public Boolean isOccupied(int rank) {
-        //foods.stream().noneMatch(food -> !food.isPreparing() && food.getComplexity() <= rank);
-        //foods.stream().allMatch(food -> (food.isPreparing() || food.getComplexity() > rank) );
-        return foods.stream().noneMatch(food -> !food.isPreparing() && food.getComplexity() <= rank);
-    }
-
-    @JsonIgnore
-    public Boolean isOccupied() {
-        return foods.stream().allMatch(Food::isPreparing);
+        return foods.stream().noneMatch(foods -> !foods.isPreparing() && foods.getComplexity() <= rank && isApparatusFree(foods.getCooking_apparatus()));
     }
 
     @Override
