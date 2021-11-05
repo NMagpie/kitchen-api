@@ -7,6 +7,7 @@
 ## Technologies used:
 * ### JDK: 11
 * ### Spring Boot: 2.5.5
+* ### Jackson core: 2.12.5
 
 ## Configure
 
